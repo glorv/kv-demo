@@ -1,4 +1,7 @@
 use std::io::{Read, Write};
+use std::cmp::min;
+
+use errors::*;
 
 pub const MAGIC_NUMBER: i32 = 0x3FD7_6C17;
 
@@ -6,7 +9,7 @@ pub trait DataInput: Read {
     fn read_byte(&mut self) -> Result<u8> {
         let mut buffer = [0u8; 1];
         if self.read(&mut buffer)? != 1 {
-            bail!(UnexpectedEOF(
+            bail!(ErrorKind::UnexpectedEOF(
                 "Reached EOF when a single byte is expected".to_owned()
             ))
         } else {
@@ -23,13 +26,13 @@ pub trait DataInput: Read {
                 end,
                 b.len(),
             );
-            bail!(IllegalArgument(msg));
+            bail!(ErrorKind::IllegalArgument(msg));
         }
 
         let mut blob = &mut b[offset..end];
 
         if self.read(&mut blob)? != length {
-            bail!(UnexpectedEOF(format!(
+            bail!(ErrorKind::UnexpectedEOF(format!(
                 "Reached EOF when {} bytes are expected",
                 length
             )))
@@ -78,7 +81,7 @@ pub trait DataInput: Read {
         i |= (i32::from(b) & 0x0f) << 28;
 
         if (b as u8 & 0xf0) != 0 {
-            bail!(IllegalState("Invalid vInt detected".to_owned()));
+            bail!(ErrorKind::IllegalState("Invalid vInt detected".to_owned()));
         }
 
         Ok(i)
@@ -92,7 +95,7 @@ pub trait DataInput: Read {
         const ERR_MSG: &str = "Invalid String detected";
         let length = self.read_vint()?;
         if length < 0 {
-            bail!(IllegalState(vERR_MSG.to_owned()));
+            bail!(ErrorKind::IllegalState(ERR_MSG.to_owned()));
         }
 
         let length = length as usize;
@@ -131,7 +134,7 @@ pub trait DataOutput: Write {
     fn write_bytes(&mut self, b: &[u8], offset: usize, length: usize) -> Result<()> {
         let end = offset + length;
         if b.len() < end {
-            bail!(IllegalArgument("b.len() < end".to_owned()));
+            bail!(ErrorKind::IllegalArgument("b.len() < end".to_owned()));
         }
         let blob = &b[offset..end];
         self.write_all(blob)?;
@@ -169,7 +172,7 @@ pub trait DataOutput: Write {
 
 pub enum KVAction {
     Put(Vec<u8>, Vec<u8>),
-    Remove(Vec<u8>)
+    Remove(Vec<u8>),
 }
 
 const ACTION_PUT: u8 = 1;
@@ -183,14 +186,14 @@ pub trait KVDataInput: DataInput {
         }
         if key_len == 0 {
             if !allow_empty {
-                bail!("invalid data length '{}'", key_len);
+                bail!("invalid data length '{}'", key_len)
             } else {
                 Ok(Vec::new())
             }
         } else {
             let key_len = key_len as usize;
             let mut key = Vec::with_capacity(key_len);
-            key.resize_with(key_len, 0);
+            key.resize(key_len, 0);
             self.read_bytes(&mut key, 0, key_len)?;
             Ok(key)
         }
@@ -212,7 +215,7 @@ pub trait KVDataInput: DataInput {
     }
 }
 
-pub trait KVDataOutput: DataOutput {
+pub trait KVDataOutput: DataOutput + Send + Sync {
     fn write_byte_array(&mut self, data: &[u8]) -> Result<()> {
         let length = data.len();
         self.write_vint(length as i32)?;
@@ -237,3 +240,7 @@ pub trait KVDataOutput: DataOutput {
         Ok(())
     }
 }
+
+impl<'a> DataInput for &'a [u8] {}
+
+impl<'a> DataOutput for &'a mut [u8] {}

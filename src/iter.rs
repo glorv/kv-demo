@@ -5,7 +5,9 @@ pub trait KVIterator<K, V> {
     fn key(&self) -> &K;
     fn value(&self) -> &V;
     fn next(&mut self);
-    fn advance<Q: ?Sized + Ord>(&mut self, key: &Q) where K: Borrow<Q>;
+    fn advance<Q: ?Sized + Ord>(&mut self, key: &Q)
+    where
+        K: Borrow<Q>;
 }
 
 #[cfg(test)]

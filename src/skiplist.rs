@@ -1,25 +1,23 @@
 use std::borrow::Borrow;
-use std::hash::Hash;
 use std::cmp::{Eq, Ordering, PartialOrd};
 use std::fmt::Debug;
+use std::fs::File;
+use std::hash::Hash;
 use std::mem;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
-use std::fs::File;
 
-use bincode::{serialize, deserialize};
-use iter::KVIterator;
-use io::{KVDataOutput, KVDataInput, MAGIC_NUMBER, KVAction};
+use codec::BytesSerializer;
 use fs::{FsDataInput, FsDataOutput};
-use serde::{Serialize, Deserialize};
+use io::{DataInput, KVAction, KVDataInput, KVDataOutput, MAGIC_NUMBER};
+use iter::KVIterator;
 
-use rand::prelude::random;
 use errors::*;
+use rand::prelude::random;
 
 const MAX_HEIGHT: u8 = 20;
 const HEIGHT_INCR: u32 = u32::max_value() / 3;
 const ALOG_CURRENT: i32 = 1;
-
 
 #[derive(Debug)]
 pub struct Entry<K, V> {
@@ -29,9 +27,7 @@ pub struct Entry<K, V> {
 
 impl<K: Clone + Hash + Eq, V: Debug> Entry<K, V> {
     pub fn new(key: K, value: V) -> Entry<K, V> {
-        Entry {
-            key, value
-        }
+        Entry { key, value }
     }
 }
 
@@ -81,7 +77,11 @@ fn random_height() -> u8 {
     h
 }
 
-impl<K, V> Table<K, V> where K: Clone + Hash + Ord + Debug + Serialize, V: Debug + Serialize {
+impl<K, V> Table<K, V>
+where
+    K: Debug + Clone + Hash + Ord + Eq+ BytesSerializer,
+    V: Debug + Clone+ BytesSerializer,
+{
     pub fn with_capacity(size: usize) -> Table<K, V> {
         let head = Node::empty(MAX_HEIGHT);
         let mut node_table = Vec::with_capacity(size);
@@ -95,16 +95,16 @@ impl<K, V> Table<K, V> where K: Clone + Hash + Ord + Debug + Serialize, V: Debug
         }
     }
 
-    pub fn open<T: AsRef<Path>>(path: &T, capacity: usize) -> Result<Table> {
-        if Path::is_file(path) {
+    pub fn open<T: AsRef<Path>>(path: &T, capacity: usize) -> Result<Table<K, V>> {
+        if Path::is_file(path.as_ref()) {
             let mut table = Self::read_from_file(path)?;
-            let output = FsDataOutput::open_exist(path)?;
+            let output = Box::new(FsDataOutput::open_exist(path)?);
             table.output = Some(output);
             Ok(table)
         } else {
             let mut table = Self::with_capacity(capacity);
-            let output = FsDataOutput::open_new(path)?;
-            table.add_output_header(output, capacity)?;
+            let mut output = Box::new(FsDataOutput::open_new(path)?);
+            table.add_output_header(output.as_mut(), capacity)?;
             table.output = Some(output);
             Ok(table)
         }
@@ -116,8 +116,8 @@ impl<K, V> Table<K, V> where K: Clone + Hash + Ord + Debug + Serialize, V: Debug
         output.write_vint(capacity as i32)
     }
 
-    fn read_from_file(path: &T) -> Result<Table<K, V>> {
-        assert!(Path::is_file(path));
+    fn read_from_file<T: AsRef<Path>>(path: &T) -> Result<Table<K, V>> {
+        assert!(Path::is_file(path.as_ref()));
         let mut reader = FsDataInput::open_input(path)?;
 
         let magic = reader.read_int()?;
@@ -130,24 +130,24 @@ impl<K, V> Table<K, V> where K: Clone + Hash + Ord + Debug + Serialize, V: Debug
         }
 
         let capacity = reader.read_vint()?;
-        if capasity <= 0 {
+        if capacity <= 0 {
             bail!("invalid table capacity '{}'", capacity);
         }
         let mut table = Self::with_capacity(capacity as usize);
         for _ in 0..capacity {
             match reader.read_kv_action()? {
-                KVAction::Put(ref key_bytes, ref value_bytes) => {
-                    let key: K = deserialize(key_bytes)?;
-                    let value: V = deserialize(value_bytes)?;
+                KVAction::Put(key_bytes, value_bytes) => {
+                    let key = K::from_bytes(&key_bytes)?;
+                    let value = V::from_bytes(&value_bytes)?;
                     table.put(key, value);
                 }
-                KVAction::Remove(ref key_bytes) => {
-                    let key: K = deserialize(key_bytes)?;
-                    table.remove(&K);
+                KVAction::Remove(key_bytes) => {
+                    let key: K = K::from_bytes(&key_bytes)?;
+                    table.remove(&key);
                 }
             }
         }
-        return Ok(table)
+        return Ok(table);
     }
 
     pub fn can_put(&self) -> bool {
@@ -169,12 +169,15 @@ impl<K, V> Table<K, V> where K: Clone + Hash + Ord + Debug + Serialize, V: Debug
         before: usize,
         level: usize,
         allow_equal: bool,
-    ) -> (usize, usize) where K : Borrow<Q> {
+    ) -> (usize, usize)
+    where
+        K: Borrow<Q>,
+    {
         let mut before = before;
         loop {
             let next = self.get_next_index(before, level);
             if next == 0 {
-                return (before, next)
+                return (before, next);
             }
             let ord = key.cmp(&self.node_table[next].entry.as_ref().unwrap().key.borrow());
             if ord == Ordering::Equal {
@@ -184,7 +187,7 @@ impl<K, V> Table<K, V> where K: Clone + Hash + Ord + Debug + Serialize, V: Debug
                     return (before, self.node_table[next].tower[level] as usize);
                 }
             } else if ord == Ordering::Less {
-                return (before, next)
+                return (before, next);
             } else {
                 before = next;
             }
@@ -200,7 +203,9 @@ impl<K, V> Table<K, V> where K: Clone + Hash + Ord + Debug + Serialize, V: Debug
     }
 
     pub fn get<Q: ?Sized + Ord>(&self, key: &Q) -> Option<&V>
-    where K: Borrow<Q> {
+    where
+        K: Borrow<Q>,
+    {
         let idx = self.find_near_index(key, false, true);
         if idx > 0 {
             if let Some(ref entry) = self.node_table[idx].entry {
@@ -214,9 +219,9 @@ impl<K, V> Table<K, V> where K: Clone + Hash + Ord + Debug + Serialize, V: Debug
 
     fn write_put_alog(&mut self, key: &K, value: &V) -> Result<()> {
         if let Some(ref mut out) = self.output {
-            let key_bytes = serialize(key)?;
-            let value_bytes = serialize(value)?;
-            out.write_kv_action(&KVAction::Put(key_bytes, value_bytes))
+            let key_bytes = key.to_bytes()?;
+            let value_bytes = value.to_bytes()?;
+            out.write_kv_action(&KVAction::Put(key_bytes, value_bytes))?;
         }
         Ok(())
     }
@@ -229,7 +234,7 @@ impl<K, V> Table<K, V> where K: Clone + Hash + Ord + Debug + Serialize, V: Debug
         next.resize((MAX_HEIGHT + 1) as usize, 0);
         for i in 0..self.height {
             let idx = (self.height - 1 - i) as usize;
-            let (p, n) = self.find_splice_for_level(&key, prev[idx+1], idx, true);
+            let (p, n) = self.find_splice_for_level(&key, prev[idx + 1], idx, true);
             prev[idx] = p;
             next[idx] = n;
             if prev[idx] > 0 && prev[idx] == next[idx] {
@@ -240,8 +245,9 @@ impl<K, V> Table<K, V> where K: Clone + Hash + Ord + Debug + Serialize, V: Debug
             }
         }
 
-        assert!(self.node_table.len() < self.node_table.capacity() ||
-            !self.free_indexes.is_empty());
+        assert!(
+            self.node_table.len() < self.node_table.capacity() || !self.free_indexes.is_empty()
+        );
 
         let height = random_height();
         self.write_put_alog(&key, &value)?;
@@ -255,8 +261,8 @@ impl<K, V> Table<K, V> where K: Clone + Hash + Ord + Debug + Serialize, V: Debug
 
         for i in 0..height as usize {
             if i > orig_height as usize {
-                let (p, n) = self.find_splice_for_level(&node.entry.as_ref().unwrap().key,
-                                                        0, i, true);
+                let (p, n) =
+                    self.find_splice_for_level(&node.entry.as_ref().unwrap().key, 0, i, true);
                 prev[i] = p;
                 next[i] = n;
             }
@@ -266,7 +272,7 @@ impl<K, V> Table<K, V> where K: Clone + Hash + Ord + Debug + Serialize, V: Debug
             } else {
                 self.node_table[next[i]].index
             };
-            node.tower[i] =next_idx as u32;
+            node.tower[i] = next_idx as u32;
             self.node_table[prev[i]].tower[i] = node_index as u32;
         }
         // this is the max key now
@@ -281,15 +287,21 @@ impl<K, V> Table<K, V> where K: Clone + Hash + Ord + Debug + Serialize, V: Debug
         Ok(())
     }
 
-    fn write_remove_alog<Q: ?Sized + Ord + Serialize>(&mut self, key: &Q) -> Result<()> where K: Borrow<Q> {
+    fn write_remove_alog<Q: ?Sized + Ord + BytesSerializer>(&mut self, key: &Q) -> Result<()>
+    where
+        K: Borrow<Q>,
+    {
         if let Some(ref mut out) = self.output {
-            let key_bytes = serialize(key)?;
-            out.write_kv_action(&KVAction::Remove(key_bytes))
+            let key_bytes =  key.to_bytes()?;
+            out.write_kv_action(&KVAction::Remove(key_bytes))?;
         }
         Ok(())
     }
 
-    pub fn remove<Q: ?Sized + Ord + Serialize>(&mut self, key: &Q) -> Result<Option<V>> where K: Borrow<Q> {
+    pub fn remove<Q: ?Sized + Ord + BytesSerializer>(&mut self, key: &Q) -> Result<Option<V>>
+    where
+        K: Borrow<Q>,
+    {
         let idx = self.find_near_index(key, false, true);
         if idx > 0 && (&self.node_table[idx].entry.as_ref().unwrap().key).borrow() == key {
             self.write_remove_alog(key);
@@ -313,7 +325,9 @@ impl<K, V> Table<K, V> where K: Clone + Hash + Ord + Debug + Serialize, V: Debug
     }
 
     fn find_near_index<Q: ?Sized + Ord>(&self, key: &Q, less: bool, allow_equal: bool) -> usize
-    where K: Borrow<Q> {
+    where
+        K: Borrow<Q>,
+    {
         let mut x = 0usize;
         let mut level = self.height - 1;
         loop {
@@ -374,7 +388,13 @@ impl<K, V> Table<K, V> where K: Clone + Hash + Ord + Debug + Serialize, V: Debug
         if self.max_key_index == 0 {
             None
         } else {
-            Some(&self.node_table[self.max_key_index].entry.as_ref().unwrap().key)
+            Some(
+                &self.node_table[self.max_key_index]
+                    .entry
+                    .as_ref()
+                    .unwrap()
+                    .key,
+            )
         }
     }
 
@@ -395,12 +415,17 @@ impl<K, V> Table<K, V> where K: Clone + Hash + Ord + Debug + Serialize, V: Debug
     }
 }
 
-pub struct SkipListIterator<K, V, T: Deref<Target=Table<K, V>>> {
+pub struct SkipListIterator<K, V, T: Deref<Target = Table<K, V>>> {
     skip_list: T,
-    node_idx: usize
+    node_idx: usize,
 }
 
-impl<K, V, T> SkipListIterator<K, V, T> where K: Clone + Hash + Ord + Debug, V: Debug, T: Deref<Target=Table<K, V>> {
+impl<K, V, T> SkipListIterator<K, V, T>
+where
+    K: 'static + Debug + Clone + Hash + Ord + Eq+ BytesSerializer,
+    V: 'static + Debug + Clone+ BytesSerializer,
+    T: Deref<Target = Table<K, V>>,
+{
     pub fn new(t: T) -> SkipListIterator<K, V, T> {
         SkipListIterator {
             skip_list: t,
@@ -409,23 +434,52 @@ impl<K, V, T> SkipListIterator<K, V, T> where K: Clone + Hash + Ord + Debug, V: 
     }
 }
 
-impl<K, V, T> Eq for SkipListIterator<K, V, T> where K: Clone + Hash + Ord + Debug, V: Debug, T: Deref<Target=Table<K, V>> {
-}
+impl<K, V, T> Eq for SkipListIterator<K, V, T>
+where
+    K: Debug + Clone + Hash + Ord + Eq+ BytesSerializer,
+    V: Debug + Clone+ BytesSerializer,
+    T: Deref<Target = Table<K, V>>,
+{}
 
-impl<K, V, T> PartialEq for SkipListIterator<K, V, T> where K: Clone + Hash + Ord + Debug, V: Debug, T: Deref<Target=Table<K, V>> {
+impl<K, V, T> PartialEq for SkipListIterator<K, V, T>
+where
+    K: Debug + Clone + Hash + Ord + Eq+ BytesSerializer,
+    V: Debug + Clone+ BytesSerializer,
+    T: Deref<Target = Table<K, V>>,
+{
     fn eq(&self, other: &Self) -> bool {
-        self.valid() && other.valid() && &self.skip_list.node_table[self.node_idx].entry.as_ref().unwrap().key
-            == &other.skip_list.node_table[other.node_idx].entry.as_ref().unwrap().key
+        self.valid()
+            && other.valid()
+            && &self.skip_list.node_table[self.node_idx]
+                .entry
+                .as_ref()
+                .unwrap()
+                .key
+                == &other.skip_list.node_table[other.node_idx]
+                    .entry
+                    .as_ref()
+                    .unwrap()
+                    .key
     }
 }
 
-impl<K, V, T> Ord for SkipListIterator<K, V, T> where K: Clone + Hash + Ord + Debug, V: Debug, T: Deref<Target=Table<K, V>> {
+impl<K, V, T> Ord for SkipListIterator<K, V, T>
+where
+    K: Debug + Clone + Hash + Ord + Eq+ BytesSerializer,
+    V: Debug + Clone+ BytesSerializer,
+    T: Deref<Target = Table<K, V>>,
+{
     fn cmp(&self, other: &Self) -> Ordering {
         self.partial_cmp(&other).unwrap()
     }
 }
 
-impl<K, V, T> PartialOrd for SkipListIterator<K, V, T> where K: Clone + Hash + Ord + Debug, V: Debug, T: Deref<Target=Table<K, V>> {
+impl<K, V, T> PartialOrd for SkipListIterator<K, V, T>
+where
+    K: Debug + Clone + Hash + Ord + Eq+ BytesSerializer,
+    V: Debug + Clone+ BytesSerializer,
+    T: Deref<Target = Table<K, V>>,
+{
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         if !self.valid() {
             if !other.valid() {
@@ -436,30 +490,53 @@ impl<K, V, T> PartialOrd for SkipListIterator<K, V, T> where K: Clone + Hash + O
         } else if !other.valid() {
             Some(Ordering::Greater)
         } else {
-            Some((&other.skip_list.node_table[other.node_idx].entry.as_ref().unwrap().key).cmp(
-                &self.skip_list.node_table[self.node_idx].entry.as_ref().unwrap().key))
+            Some(
+                (&other.skip_list.node_table[other.node_idx]
+                    .entry
+                    .as_ref()
+                    .unwrap()
+                    .key)
+                    .cmp(
+                        &self.skip_list.node_table[self.node_idx]
+                            .entry
+                            .as_ref()
+                            .unwrap()
+                            .key,
+                    ),
+            )
         }
     }
 }
 
-impl<K, V, T> KVIterator<K, V> for SkipListIterator<K, V, T> where K: Clone + Hash + Ord + Debug, V: Debug, T: Deref<Target=Table<K, V>> {
+impl<K, V, T> KVIterator<K, V> for SkipListIterator<K, V, T>
+where
+    K: Debug + Clone + Hash + Ord + Eq+ BytesSerializer,
+    V: Debug + Clone+ BytesSerializer,
+    T: Deref<Target = Table<K, V>>,
+{
     fn valid(&self) -> bool {
-        unsafe {
-            self.node_idx < self.skip_list.node_table.len()
-        }
+        unsafe { self.node_idx < self.skip_list.node_table.len() }
     }
 
     fn key(&self) -> &K {
         debug_assert!(self.valid());
         unsafe {
-            &self.skip_list.node_table[self.node_idx].entry.as_ref().unwrap().key
+            &self.skip_list.node_table[self.node_idx]
+                .entry
+                .as_ref()
+                .unwrap()
+                .key
         }
     }
 
     fn value(&self) -> &V {
         debug_assert!(self.valid());
         unsafe {
-            &self.skip_list.node_table[self.node_idx].entry.as_ref().unwrap().value
+            &self.skip_list.node_table[self.node_idx]
+                .entry
+                .as_ref()
+                .unwrap()
+                .value
         }
     }
 
@@ -473,19 +550,22 @@ impl<K, V, T> KVIterator<K, V> for SkipListIterator<K, V, T> where K: Clone + Ha
         }
     }
 
-//    fn prev(&mut self) {
-//        debug_assert!(self.has_next());
-//        unsafe {
-//            let node_index = (*self.skip_list).find_near_index(self.key(), true, false);
-//            if node_index > 0 {
-//                self.node_idx = node_index
-//            } else {
-//                self.node_idx = usize::max_value();
-//            }
-//        }
-//    }
+    //    fn prev(&mut self) {
+    //        debug_assert!(self.has_next());
+    //        unsafe {
+    //            let node_index = (*self.skip_list).find_near_index(self.key(), true, false);
+    //            if node_index > 0 {
+    //                self.node_idx = node_index
+    //            } else {
+    //                self.node_idx = usize::max_value();
+    //            }
+    //        }
+    //    }
 
-    fn advance<Q: ?Sized + Ord>(&mut self, key: &Q) where K: Borrow<Q> {
+    fn advance<Q: ?Sized + Ord>(&mut self, key: &Q)
+    where
+        K: Borrow<Q>,
+    {
         debug_assert!(self.valid());
         unsafe {
             let node_index = self.skip_list.find_near_index(key, false, true);

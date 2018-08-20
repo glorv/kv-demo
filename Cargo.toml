@@ -4,8 +4,13 @@ version = "0.1.0"
 authors = ["gaolei <glorvs@163.com>"]
 
 [dependencies]
-bincode="1.0"
+clap="2.29"
 error-chain="0.11"
+futures = "0.1"
+log = "0.4"
+grpcio = "0.2"
+num_cpus = "1.0"
+protobuf = "1.5"
 rand="0.5"
-serde = "1.0"
-serde_derive = "1.0"
+serde="1.0.45"
+serde_derive="1.0.45"

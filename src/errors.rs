@@ -15,9 +15,22 @@ error_chain! {
             description(errmsg)
             display("Unexpected EOF: {}", errmsg)
         }
+
+        IllegalArgument(desc: String) {
+            description(desc)
+            display("Illegal argument: {}", desc)
+        }
+
+        IllegalState(desc: String) {
+            description(desc)
+            display("Illegal state: {}", desc)
+        }
     }
 
     foreign_links {
         IoError(::std::io::Error);
+        FromUtf8Err(::std::string::FromUtf8Error);
+        GrpcioError(::grpcio::Error);
+        ParseIntErr(::std::num::ParseIntError);
     }
 }
