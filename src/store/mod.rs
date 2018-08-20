@@ -1,7 +1,8 @@
 use std::io::{Read, Write};
-use std::cmp::min;
 
 use errors::*;
+
+pub mod fs;
 
 pub const MAGIC_NUMBER: i32 = 0x3FD7_6C17;
 
@@ -233,8 +234,8 @@ pub trait KVDataOutput: DataOutput + Send + Sync {
                 self.write_byte_array(value)?;
             }
             &KVAction::Remove(ref key) => {
-                self.write_byte(ACTION_REMOVE);
-                self.write_byte_array(key);
+                self.write_byte(ACTION_REMOVE)?;
+                self.write_byte_array(key)?;
             }
         }
         Ok(())

@@ -1,14 +1,12 @@
-use std::panic::catch_unwind;
 use std::sync::Arc;
 
 use futures::Future;
-use grpcio::{RpcContext, RpcStatus, RpcStatusCode, UnarySink};
+use grpcio::{RpcContext, UnarySink};
 
-use codec::BytesSerializer;
 use db::{Database, DatabaseIterator};
 use iter::KVIterator;
-use proto::kv_grpc::KvService;
 use proto::kv::*;
+use proto::kv_grpc::KvService;
 
 #[derive(Clone)]
 pub struct KVServer {
@@ -17,9 +15,7 @@ pub struct KVServer {
 
 impl KVServer {
     pub fn new(db: Database<Vec<u8>, Vec<u8>>) -> KVServer {
-        KVServer {
-            db: Arc::new(db),
-        }
+        KVServer { db: Arc::new(db) }
     }
 }
 
@@ -42,7 +38,10 @@ impl KvService for KVServer {
 
     fn put(&self, ctx: RpcContext, req: KVPair, sink: UnarySink<PutResponse>) {
         let mut r = PutResponse::new();
-        if let Err(e) = self.db.put(req.get_key().to_vec(), req.get_value().to_vec()) {
+        if let Err(e) = self
+            .db
+            .put(req.get_key().to_vec(), req.get_value().to_vec())
+        {
             r.set_status(Status::FAILED);
             r.set_error(format!("{}", e));
         } else {
@@ -60,9 +59,11 @@ impl KvService for KVServer {
             iter.advance(key);
         }
         let mut r = ScanResponse::new();
-        let mut count = 0;
-        while iter.valid() {
-            if req.count <= count {
+        loop {
+            if !iter.valid() {
+                break;
+            }
+            if req.count <= r.data.len() as i32 {
                 break;
             }
             if !req.can_equal && iter.key().as_slice() == key {
@@ -72,6 +73,7 @@ impl KvService for KVServer {
             pair.set_key(iter.key().clone());
             pair.set_value(iter.value().clone());
             r.data.push(pair);
+            iter.next();
         }
         r.set_status(Status::OK);
         let fut = sink.success(r);

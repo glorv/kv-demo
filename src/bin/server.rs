@@ -2,43 +2,30 @@
 
 #[macro_use]
 extern crate error_chain;
-#[macro_use]
-extern crate serde_derive;
 extern crate clap;
 extern crate futures;
 extern crate grpcio;
-#[macro_use]
+extern crate kvdemo;
 extern crate log;
 extern crate num_cpus;
 extern crate protobuf;
 extern crate rand;
 extern crate serde;
+extern crate serde_derive;
 
-mod codec;
-mod db;
-mod errors;
-mod fs;
-mod io;
-mod iter;
-mod proto;
-mod server;
-mod skiplist;
-
-use std::fmt;
+use std::io::{self as stdio, Read};
 use std::sync::Arc;
 use std::thread;
-use std::io::{self as stdio, Read};
 
 use clap::{App, Arg};
-use futures::Future;
 use futures::sync::oneshot;
+use futures::Future;
 use grpcio::{ChannelBuilder, Environment, ServerBuilder};
 
-use errors::Result;
-use db::{Config, Database};
-use iter::KVIterator;
-use skiplist::Table;
-use server::KVServer;
+use kvdemo::db::{Config, Database};
+use kvdemo::errors::Result;
+use kvdemo::proto;
+use kvdemo::server::KVServer;
 
 struct ServerConfig {
     db_config: Config,
@@ -57,13 +44,13 @@ fn parse_cmdline_flags() -> Result<ServerConfig> {
                 .required(false)
                 .takes_value(true),
         ).arg(
-        Arg::with_name("port")
-            .short("p")
-            .long("port")
-            .help("server bind port")
-            .required(false)
-            .takes_value(true),
-    ).get_matches();
+            Arg::with_name("port")
+                .short("p")
+                .long("port")
+                .help("server bind port")
+                .required(false)
+                .takes_value(true),
+        ).get_matches();
 
     let data_path = matches.value_of("config").map(|s| s.to_string());
     let port = {
@@ -79,9 +66,7 @@ fn parse_cmdline_flags() -> Result<ServerConfig> {
         merge_table_count: 5,
         data_dir: data_path,
     };
-    Ok(ServerConfig {
-        db_config, port
-    })
+    Ok(ServerConfig { db_config, port })
 }
 
 fn run() -> Result<()> {

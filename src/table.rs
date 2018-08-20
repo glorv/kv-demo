@@ -1,16 +1,15 @@
 use std::borrow::Borrow;
 use std::cmp::{Eq, Ordering, PartialOrd};
 use std::fmt::Debug;
-use std::fs::File;
 use std::hash::Hash;
 use std::mem;
 use std::ops::Deref;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use codec::BytesSerializer;
-use fs::{FsDataInput, FsDataOutput};
-use io::{DataInput, KVAction, KVDataInput, KVDataOutput, MAGIC_NUMBER};
 use iter::KVIterator;
+use store::fs::{FsDataInput, FsDataOutput};
+use store::{DataInput, KVAction, KVDataInput, KVDataOutput, MAGIC_NUMBER};
 
 use errors::*;
 use rand::prelude::random;
@@ -79,8 +78,8 @@ fn random_height() -> u8 {
 
 impl<K, V> Table<K, V>
 where
-    K: Debug + Clone + Hash + Ord + Eq+ BytesSerializer,
-    V: Debug + Clone+ BytesSerializer,
+    K: Debug + Clone + Hash + Ord + Eq + BytesSerializer,
+    V: Debug + Clone + BytesSerializer,
 {
     pub fn with_capacity(size: usize) -> Table<K, V> {
         let head = Node::empty(MAX_HEIGHT);
@@ -134,16 +133,19 @@ where
             bail!("invalid table capacity '{}'", capacity);
         }
         let mut table = Self::with_capacity(capacity as usize);
-        for _ in 0..capacity {
+        loop {
+            if reader.is_end()? {
+                break;
+            }
             match reader.read_kv_action()? {
                 KVAction::Put(key_bytes, value_bytes) => {
                     let key = K::from_bytes(&key_bytes)?;
                     let value = V::from_bytes(&value_bytes)?;
-                    table.put(key, value);
+                    table.put(key, value)?;
                 }
                 KVAction::Remove(key_bytes) => {
                     let key: K = K::from_bytes(&key_bytes)?;
-                    table.remove(&key);
+                    table.remove(&key)?;
                 }
             }
         }
@@ -152,10 +154,6 @@ where
 
     pub fn can_put(&self) -> bool {
         self.node_table.len() < self.node_table.capacity() || !self.free_indexes.is_empty()
-    }
-
-    fn is_valid_index(&self, i: u32) -> bool {
-        0 < i && i < self.node_table.capacity() as u32
     }
 
     fn get_next_index(&self, before: usize, level: usize) -> usize {
@@ -292,7 +290,7 @@ where
         K: Borrow<Q>,
     {
         if let Some(ref mut out) = self.output {
-            let key_bytes =  key.to_bytes()?;
+            let key_bytes = key.to_bytes()?;
             out.write_kv_action(&KVAction::Remove(key_bytes))?;
         }
         Ok(())
@@ -304,7 +302,7 @@ where
     {
         let idx = self.find_near_index(key, false, true);
         if idx > 0 && (&self.node_table[idx].entry.as_ref().unwrap().key).borrow() == key {
-            self.write_remove_alog(key);
+            self.write_remove_alog(key)?;
             let height = self.node_table[idx].height;
             let mut prev = 0usize;
             for j in 0..height {
@@ -422,8 +420,8 @@ pub struct SkipListIterator<K, V, T: Deref<Target = Table<K, V>>> {
 
 impl<K, V, T> SkipListIterator<K, V, T>
 where
-    K: 'static + Debug + Clone + Hash + Ord + Eq+ BytesSerializer,
-    V: 'static + Debug + Clone+ BytesSerializer,
+    K: 'static + Debug + Clone + Hash + Ord + Eq + BytesSerializer,
+    V: 'static + Debug + Clone + BytesSerializer,
     T: Deref<Target = Table<K, V>>,
 {
     pub fn new(t: T) -> SkipListIterator<K, V, T> {
@@ -436,15 +434,15 @@ where
 
 impl<K, V, T> Eq for SkipListIterator<K, V, T>
 where
-    K: Debug + Clone + Hash + Ord + Eq+ BytesSerializer,
-    V: Debug + Clone+ BytesSerializer,
+    K: Debug + Clone + Hash + Ord + Eq + BytesSerializer,
+    V: Debug + Clone + BytesSerializer,
     T: Deref<Target = Table<K, V>>,
 {}
 
 impl<K, V, T> PartialEq for SkipListIterator<K, V, T>
 where
-    K: Debug + Clone + Hash + Ord + Eq+ BytesSerializer,
-    V: Debug + Clone+ BytesSerializer,
+    K: Debug + Clone + Hash + Ord + Eq + BytesSerializer,
+    V: Debug + Clone + BytesSerializer,
     T: Deref<Target = Table<K, V>>,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -465,8 +463,8 @@ where
 
 impl<K, V, T> Ord for SkipListIterator<K, V, T>
 where
-    K: Debug + Clone + Hash + Ord + Eq+ BytesSerializer,
-    V: Debug + Clone+ BytesSerializer,
+    K: Debug + Clone + Hash + Ord + Eq + BytesSerializer,
+    V: Debug + Clone + BytesSerializer,
     T: Deref<Target = Table<K, V>>,
 {
     fn cmp(&self, other: &Self) -> Ordering {
@@ -476,8 +474,8 @@ where
 
 impl<K, V, T> PartialOrd for SkipListIterator<K, V, T>
 where
-    K: Debug + Clone + Hash + Ord + Eq+ BytesSerializer,
-    V: Debug + Clone+ BytesSerializer,
+    K: Debug + Clone + Hash + Ord + Eq + BytesSerializer,
+    V: Debug + Clone + BytesSerializer,
     T: Deref<Target = Table<K, V>>,
 {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
@@ -510,34 +508,30 @@ where
 
 impl<K, V, T> KVIterator<K, V> for SkipListIterator<K, V, T>
 where
-    K: Debug + Clone + Hash + Ord + Eq+ BytesSerializer,
-    V: Debug + Clone+ BytesSerializer,
+    K: Debug + Clone + Hash + Ord + Eq + BytesSerializer,
+    V: Debug + Clone + BytesSerializer,
     T: Deref<Target = Table<K, V>>,
 {
     fn valid(&self) -> bool {
-        unsafe { self.node_idx < self.skip_list.node_table.len() }
+        self.node_idx < self.skip_list.node_table.len()
     }
 
     fn key(&self) -> &K {
         debug_assert!(self.valid());
-        unsafe {
-            &self.skip_list.node_table[self.node_idx]
-                .entry
-                .as_ref()
-                .unwrap()
-                .key
-        }
+        &self.skip_list.node_table[self.node_idx]
+            .entry
+            .as_ref()
+            .unwrap()
+            .key
     }
 
     fn value(&self) -> &V {
         debug_assert!(self.valid());
-        unsafe {
-            &self.skip_list.node_table[self.node_idx]
-                .entry
-                .as_ref()
-                .unwrap()
-                .value
-        }
+        &self.skip_list.node_table[self.node_idx]
+            .entry
+            .as_ref()
+            .unwrap()
+            .value
     }
 
     fn next(&mut self) {
@@ -567,13 +561,11 @@ where
         K: Borrow<Q>,
     {
         debug_assert!(self.valid());
-        unsafe {
-            let node_index = self.skip_list.find_near_index(key, false, true);
-            if node_index > 0 {
-                self.node_idx = node_index
-            } else {
-                self.node_idx = usize::max_value();
-            }
+        let node_index = self.skip_list.find_near_index(key, false, true);
+        if node_index > 0 {
+            self.node_idx = node_index
+        } else {
+            self.node_idx = usize::max_value();
         }
     }
 }
@@ -601,13 +593,13 @@ pub mod tests {
         assert_eq!(table.get("50"), Some(&50));
 
         for i in 0..100 {
-            assert_eq!(table.remove(&i.to_string()), Some(i));
+            assert_eq!(table.remove(&i.to_string()).unwrap(), Some(i));
         }
 
         let mut table: Table<u32, String> = Table::with_capacity(65536);
         let mut v = rand_int_array();
         for i in &v {
-            table.put(*i, i.to_string());
+            assert!(table.put(*i, i.to_string()).is_ok());
         }
 
         for i in &v {

@@ -1,32 +1,29 @@
 use std::borrow::Borrow;
-use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 use std::fmt::Debug;
-use std::fs::{read_dir, File};
+use std::fs::read_dir;
 use std::hash::Hash;
-use std::ops::{Deref, Index};
-use std::path::{Path, PathBuf};
+use std::ops::Index;
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrder};
 use std::sync::{Arc, RwLock, RwLockReadGuard};
 
-use serde::{Deserialize, Serialize};
-
-use errors::*;
 use codec::BytesSerializer;
+use errors::*;
 use iter::KVIterator;
-use skiplist::{SkipListIterator, Table};
+use table::{SkipListIterator, Table};
 
 const ALOG_POSTFIX: &str = ".alog";
 
 pub trait Storage<K, V> {
     type Iter: KVIterator<K, V>;
     fn put(&mut self, key: K, value: V);
-    fn get<Q: ? Sized + Ord>(&self, key: &Q) -> Option<V>
-        where
-            K: Borrow<Q>;
-    fn remove<Q: ? Sized + Ord>(&mut self, key: &Q) -> Option<V>
-        where
-            K: Borrow<Q>;
+    fn get<Q: ?Sized + Ord>(&self, key: &Q) -> Option<V>
+    where
+        K: Borrow<Q>;
+    fn remove<Q: ?Sized + Ord>(&mut self, key: &Q) -> Option<V>
+    where
+        K: Borrow<Q>;
     fn iter(&self) -> Self::Iter;
 }
 
@@ -40,13 +37,15 @@ pub struct Config {
 pub struct Database<K, V> {
     tables: Arc<RwLock<Vec<Arc<RwLock<Table<K, V>>>>>>,
     config: Config,
-    merging_tables_idx: Vec<usize>,
+    _merging_tables_idx: Vec<usize>,
     version_counter: AtomicUsize,
 }
 
-impl<K, V> Database<K, V> where
-    K: Debug + Clone + Hash + Ord + Eq+ BytesSerializer,
-    V: Debug + Clone+ BytesSerializer {
+impl<K, V> Database<K, V>
+where
+    K: Debug + Clone + Hash + Ord + Eq + BytesSerializer,
+    V: Debug + Clone + BytesSerializer,
+{
     pub fn new(config: Config) -> Result<Database<K, V>> {
         let mut version = 0usize;
         let mut tables = Vec::new();
@@ -68,6 +67,13 @@ impl<K, V> Database<K, V> where
                     }
                 };
             }
+            if tables.is_empty() {
+                version += 1;
+                let mut pathbuf = PathBuf::from(path);
+                pathbuf.push(Self::gen_alog_name(version));
+                let table = Table::open(&pathbuf, config.table_capacity)?;
+                tables.push(Arc::new(RwLock::new(table)));
+            }
         } else {
             let table = Arc::new(RwLock::new(Table::with_capacity(config.table_capacity)));
             tables.push(table);
@@ -75,7 +81,7 @@ impl<K, V> Database<K, V> where
         Ok(Database {
             tables: Arc::new(RwLock::new(tables)),
             config,
-            merging_tables_idx: Vec::new(),
+            _merging_tables_idx: Vec::new(),
             version_counter: AtomicUsize::new(version + 1),
         })
     }
@@ -84,37 +90,40 @@ impl<K, V> Database<K, V> where
         let version = self.version_counter.fetch_add(1, AtomicOrder::SeqCst);
         if let Some(ref dir) = self.config.data_dir {
             let mut pathbuf = PathBuf::from(dir);
-            pathbuf.push(self.gen_alog_name(version));
+            pathbuf.push(Self::gen_alog_name(version));
             Table::open(&pathbuf, self.config.table_capacity)
         } else {
             Ok(Table::with_capacity(self.config.table_capacity))
         }
     }
 
-    fn gen_alog_name(&self, version: usize) -> String {
+    fn gen_alog_name(version: usize) -> String {
         format!("{}{}", version, ALOG_POSTFIX)
     }
 
     pub fn put(&self, key: K, value: V) -> Result<()> {
-        if let Ok(ref tables) = self.tables.read() {
-            for table in tables.iter() {
-                if let Ok(t) = table.read() {
-                    if t.get(&key).is_none() {
-                        continue;
+        {
+            if let Ok(ref tables) = self.tables.read() {
+                for table in &**tables {
+                    if let Ok(t) = table.read() {
+                        if t.get(&key).is_none() {
+                            continue;
+                        }
+                    }
+                    if let Ok(mut t) = table.write() {
+                        return t.put(key, value);
                     }
                 }
-                if let Ok(mut t) = table.write() {
-                    return t.put(key, value);
-                }
-            }
-            for table in tables.iter() {
-                if let Ok(mut t) = table.write() {
-                    if t.can_put() {
-                        return t.put(key, value);
+                for table in &**tables {
+                    if let Ok(mut t) = table.write() {
+                        if t.can_put() {
+                            return t.put(key, value);
+                        }
                     }
                 }
             }
         }
+
         // add new table
         let mut table = self.new_table()?;
         table.put(key, value)?;
@@ -125,9 +134,9 @@ impl<K, V> Database<K, V> where
         Ok(())
     }
 
-    pub fn get<Q: ? Sized + Ord>(&self, key: &Q) -> Option<V>
-        where
-            K: Borrow<Q>,
+    pub fn get<Q: ?Sized + Ord>(&self, key: &Q) -> Option<V>
+    where
+        K: Borrow<Q>,
     {
         if let Ok(ref tables) = self.tables.read() {
             for table in tables.iter() {
@@ -141,9 +150,9 @@ impl<K, V> Database<K, V> where
         None
     }
 
-    pub fn remove<Q: ? Sized + Ord + BytesSerializer>(&mut self, key: &Q) -> Result<Option<V>>
-        where
-            K: Borrow<Q>,
+    pub fn remove<Q: ?Sized + Ord + BytesSerializer>(&mut self, key: &Q) -> Result<Option<V>>
+    where
+        K: Borrow<Q>,
     {
         if let Ok(ref tables) = self.tables.read() {
             for table in tables.iter() {
@@ -168,6 +177,11 @@ impl<K, V> Database<K, V> where
         tables
     }
 
+    // TODO merge tables
+    pub fn merge(&self) -> Result<()> {
+        unimplemented!()
+    }
+
     //    fn iter(&self) -> <Self as Storage<K, V>>::Iter {
     //        let mut tables = Vec::new();
     //        for table in self.tables.read().unwrap().iter() {
@@ -181,9 +195,11 @@ pub struct DatabaseIterator<'a, K: 'a, V: 'a> {
     sub_iters: BinaryHeap<SkipListIterator<K, V, RwLockReadGuard<'a, Table<K, V>>>>,
 }
 
-impl<'a, K, V> DatabaseIterator<'a, K, V> where
+impl<'a, K, V> DatabaseIterator<'a, K, V>
+where
     K: 'static + Debug + Clone + Hash + Eq + Ord + BytesSerializer,
-    V: 'static + Debug + Clone+ BytesSerializer {
+    V: 'static + Debug + Clone + BytesSerializer,
+{
     pub fn new(tables: &'a [Arc<RwLock<Table<K, V>>>]) -> DatabaseIterator<'a, K, V> {
         let mut heap = BinaryHeap::new();
         for table in tables {
@@ -195,9 +211,11 @@ impl<'a, K, V> DatabaseIterator<'a, K, V> where
     }
 }
 
-impl<'a, K, V> KVIterator<K, V> for DatabaseIterator<'a, K, V> where
+impl<'a, K, V> KVIterator<K, V> for DatabaseIterator<'a, K, V>
+where
     K: 'a + Debug + Clone + Hash + Eq + Ord + BytesSerializer,
-    V: 'a + Debug + Clone+ BytesSerializer  {
+    V: 'a + Debug + Clone + BytesSerializer,
+{
     fn valid(&self) -> bool {
         self.sub_iters.peek().unwrap().valid()
     }
@@ -214,9 +232,9 @@ impl<'a, K, V> KVIterator<K, V> for DatabaseIterator<'a, K, V> where
         self.sub_iters.peek_mut().unwrap().next()
     }
 
-    fn advance<Q: ? Sized + Ord>(&mut self, key: &Q)
-        where
-            K: Borrow<Q>,
+    fn advance<Q: ?Sized + Ord>(&mut self, key: &Q)
+    where
+        K: Borrow<Q>,
     {
         loop {
             if self.key().borrow() >= key {
@@ -232,7 +250,19 @@ pub mod tests {
     use super::*;
     use iter::tests::rand_int_array;
     use rand::prelude::random;
-    use std::fs::create_dir_all;
+    use std::fs::{create_dir_all, remove_dir_all};
+
+    struct TestFileCleaner {
+        path: String,
+    }
+
+    impl Drop for TestFileCleaner {
+        fn drop(&mut self) {
+            if PathBuf::from(&self.path).exists() {
+                remove_dir_all(&self.path);
+            }
+        }
+    }
 
     #[test]
     fn test_database() {
@@ -260,7 +290,7 @@ pub mod tests {
         assert_eq!(db.get("50"), Some(50));
 
         for i in 0..100 {
-            assert_eq!(db.remove(&i.to_string()), Some(i));
+            assert_eq!(db.remove(&i.to_string()).unwrap(), Some(i));
         }
 
         let config = Config {
@@ -313,11 +343,13 @@ pub mod tests {
         loop {
             let rand_version: u32 = random();
             path = format!("{}{}", fmt, rand_version);
-            if !PathBuf::from(path).exists() {
-                create_dir_all(path).unwrap();
+            if !PathBuf::from(&path).exists() {
+                create_dir_all(&path).unwrap();
                 break;
             }
         }
+
+        let cleaner = TestFileCleaner { path: path.clone() };
 
         let config = Config {
             table_capacity: 16,
@@ -330,17 +362,17 @@ pub mod tests {
             let mut db = db.unwrap();
 
             for i in 0..100 {
-                assert_eq!(db.put(i.to_string(), i), Ok(()));
+                assert!(db.put(i.to_string(), i).is_ok());
             }
         }
 
         {
             let mut db = Database::new(config.clone());
             assert!(db.is_ok());
-            let mut db = db.unwrap();
+            let mut db: Database<String, i32> = db.unwrap();
 
             for i in 0..100 {
-                assert!(db.get(&i.to_string()), Some(i));
+                assert_eq!(db.get(&i.to_string()), Some(i));
             }
         }
     }
