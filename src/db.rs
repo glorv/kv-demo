@@ -150,7 +150,7 @@ where
         None
     }
 
-    pub fn remove<Q: ?Sized + Ord + BytesSerializer>(&mut self, key: &Q) -> Result<Option<V>>
+    pub fn remove<Q: ?Sized + Ord + BytesSerializer>(&self, key: &Q) -> Result<Option<V>>
     where
         K: Borrow<Q>,
     {

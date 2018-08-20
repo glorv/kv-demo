@@ -248,7 +248,7 @@ impl ::protobuf::reflect::ProtobufValue for KVPair {
 }
 
 #[derive(PartialEq,Clone,Default)]
-pub struct GetRequest {
+pub struct KeyRequest {
     // message fields
     pub key: ::std::vec::Vec<u8>,
     // special fields
@@ -257,20 +257,20 @@ pub struct GetRequest {
 }
 
 // see codegen.rs for the explanation why impl Sync explicitly
-unsafe impl ::std::marker::Sync for GetRequest {}
+unsafe impl ::std::marker::Sync for KeyRequest {}
 
-impl GetRequest {
-    pub fn new() -> GetRequest {
+impl KeyRequest {
+    pub fn new() -> KeyRequest {
         ::std::default::Default::default()
     }
 
-    pub fn default_instance() -> &'static GetRequest {
-        static mut instance: ::protobuf::lazy::Lazy<GetRequest> = ::protobuf::lazy::Lazy {
+    pub fn default_instance() -> &'static KeyRequest {
+        static mut instance: ::protobuf::lazy::Lazy<KeyRequest> = ::protobuf::lazy::Lazy {
             lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const GetRequest,
+            ptr: 0 as *const KeyRequest,
         };
         unsafe {
-            instance.get(GetRequest::new)
+            instance.get(KeyRequest::new)
         }
     }
 
@@ -309,7 +309,7 @@ impl GetRequest {
     }
 }
 
-impl ::protobuf::Message for GetRequest {
+impl ::protobuf::Message for KeyRequest {
     fn is_initialized(&self) -> bool {
         true
     }
@@ -376,12 +376,12 @@ impl ::protobuf::Message for GetRequest {
     }
 }
 
-impl ::protobuf::MessageStatic for GetRequest {
-    fn new() -> GetRequest {
-        GetRequest::new()
+impl ::protobuf::MessageStatic for KeyRequest {
+    fn new() -> KeyRequest {
+        KeyRequest::new()
     }
 
-    fn descriptor_static(_: ::std::option::Option<GetRequest>) -> &'static ::protobuf::reflect::MessageDescriptor {
+    fn descriptor_static(_: ::std::option::Option<KeyRequest>) -> &'static ::protobuf::reflect::MessageDescriptor {
         static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
             lock: ::protobuf::lazy::ONCE_INIT,
             ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
@@ -391,11 +391,11 @@ impl ::protobuf::MessageStatic for GetRequest {
                 let mut fields = ::std::vec::Vec::new();
                 fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeBytes>(
                     "key",
-                    GetRequest::get_key_for_reflect,
-                    GetRequest::mut_key_for_reflect,
+                    KeyRequest::get_key_for_reflect,
+                    KeyRequest::mut_key_for_reflect,
                 ));
-                ::protobuf::reflect::MessageDescriptor::new::<GetRequest>(
-                    "GetRequest",
+                ::protobuf::reflect::MessageDescriptor::new::<KeyRequest>(
+                    "KeyRequest",
                     fields,
                     file_descriptor_proto()
                 )
@@ -404,20 +404,20 @@ impl ::protobuf::MessageStatic for GetRequest {
     }
 }
 
-impl ::protobuf::Clear for GetRequest {
+impl ::protobuf::Clear for KeyRequest {
     fn clear(&mut self) {
         self.clear_key();
         self.unknown_fields.clear();
     }
 }
 
-impl ::std::fmt::Debug for GetRequest {
+impl ::std::fmt::Debug for KeyRequest {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         ::protobuf::text_format::fmt(self, f)
     }
 }
 
-impl ::protobuf::reflect::ProtobufValue for GetRequest {
+impl ::protobuf::reflect::ProtobufValue for KeyRequest {
     fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
         ::protobuf::reflect::ProtobufValueRef::Message(self)
     }
@@ -427,6 +427,7 @@ impl ::protobuf::reflect::ProtobufValue for GetRequest {
 pub struct GetResponse {
     // message fields
     pub status: Status,
+    pub error: ::std::string::String,
     pub exist: bool,
     pub data: ::protobuf::SingularPtrField<KVPair>,
     // special fields
@@ -475,7 +476,41 @@ impl GetResponse {
         &mut self.status
     }
 
-    // bool exist = 2;
+    // string error = 2;
+
+    pub fn clear_error(&mut self) {
+        self.error.clear();
+    }
+
+    // Param is passed by value, moved
+    pub fn set_error(&mut self, v: ::std::string::String) {
+        self.error = v;
+    }
+
+    // Mutable pointer to the field.
+    // If field is not initialized, it is initialized with default value first.
+    pub fn mut_error(&mut self) -> &mut ::std::string::String {
+        &mut self.error
+    }
+
+    // Take field
+    pub fn take_error(&mut self) -> ::std::string::String {
+        ::std::mem::replace(&mut self.error, ::std::string::String::new())
+    }
+
+    pub fn get_error(&self) -> &str {
+        &self.error
+    }
+
+    fn get_error_for_reflect(&self) -> &::std::string::String {
+        &self.error
+    }
+
+    fn mut_error_for_reflect(&mut self) -> &mut ::std::string::String {
+        &mut self.error
+    }
+
+    // bool exist = 3;
 
     pub fn clear_exist(&mut self) {
         self.exist = false;
@@ -498,7 +533,7 @@ impl GetResponse {
         &mut self.exist
     }
 
-    // .kv.KVPair data = 3;
+    // .kv.KVPair data = 4;
 
     pub fn clear_data(&mut self) {
         self.data.clear();
@@ -562,13 +597,16 @@ impl ::protobuf::Message for GetResponse {
                     self.status = tmp;
                 },
                 2 => {
+                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.error)?;
+                },
+                3 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     }
                     let tmp = is.read_bool()?;
                     self.exist = tmp;
                 },
-                3 => {
+                4 => {
                     ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.data)?;
                 },
                 _ => {
@@ -586,6 +624,9 @@ impl ::protobuf::Message for GetResponse {
         if self.status != Status::OK {
             my_size += ::protobuf::rt::enum_size(1, self.status);
         }
+        if !self.error.is_empty() {
+            my_size += ::protobuf::rt::string_size(2, &self.error);
+        }
         if self.exist != false {
             my_size += 2;
         }
@@ -602,11 +643,14 @@ impl ::protobuf::Message for GetResponse {
         if self.status != Status::OK {
             os.write_enum(1, self.status.value())?;
         }
+        if !self.error.is_empty() {
+            os.write_string(2, &self.error)?;
+        }
         if self.exist != false {
-            os.write_bool(2, self.exist)?;
+            os.write_bool(3, self.exist)?;
         }
         if let Some(ref v) = self.data.as_ref() {
-            os.write_tag(3, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_tag(4, ::protobuf::wire_format::WireTypeLengthDelimited)?;
             os.write_raw_varint32(v.get_cached_size())?;
             v.write_to_with_cached_sizes(os)?;
         }
@@ -659,6 +703,11 @@ impl ::protobuf::MessageStatic for GetResponse {
                     GetResponse::get_status_for_reflect,
                     GetResponse::mut_status_for_reflect,
                 ));
+                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
+                    "error",
+                    GetResponse::get_error_for_reflect,
+                    GetResponse::mut_error_for_reflect,
+                ));
                 fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeBool>(
                     "exist",
                     GetResponse::get_exist_for_reflect,
@@ -682,6 +731,7 @@ impl ::protobuf::MessageStatic for GetResponse {
 impl ::protobuf::Clear for GetResponse {
     fn clear(&mut self) {
         self.clear_status();
+        self.clear_error();
         self.clear_exist();
         self.clear_data();
         self.unknown_fields.clear();
@@ -701,7 +751,7 @@ impl ::protobuf::reflect::ProtobufValue for GetResponse {
 }
 
 #[derive(PartialEq,Clone,Default)]
-pub struct PutResponse {
+pub struct SetResponse {
     // message fields
     pub status: Status,
     pub error: ::std::string::String,
@@ -711,20 +761,20 @@ pub struct PutResponse {
 }
 
 // see codegen.rs for the explanation why impl Sync explicitly
-unsafe impl ::std::marker::Sync for PutResponse {}
+unsafe impl ::std::marker::Sync for SetResponse {}
 
-impl PutResponse {
-    pub fn new() -> PutResponse {
+impl SetResponse {
+    pub fn new() -> SetResponse {
         ::std::default::Default::default()
     }
 
-    pub fn default_instance() -> &'static PutResponse {
-        static mut instance: ::protobuf::lazy::Lazy<PutResponse> = ::protobuf::lazy::Lazy {
+    pub fn default_instance() -> &'static SetResponse {
+        static mut instance: ::protobuf::lazy::Lazy<SetResponse> = ::protobuf::lazy::Lazy {
             lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const PutResponse,
+            ptr: 0 as *const SetResponse,
         };
         unsafe {
-            instance.get(PutResponse::new)
+            instance.get(SetResponse::new)
         }
     }
 
@@ -786,7 +836,7 @@ impl PutResponse {
     }
 }
 
-impl ::protobuf::Message for PutResponse {
+impl ::protobuf::Message for SetResponse {
     fn is_initialized(&self) -> bool {
         true
     }
@@ -866,12 +916,12 @@ impl ::protobuf::Message for PutResponse {
     }
 }
 
-impl ::protobuf::MessageStatic for PutResponse {
-    fn new() -> PutResponse {
-        PutResponse::new()
+impl ::protobuf::MessageStatic for SetResponse {
+    fn new() -> SetResponse {
+        SetResponse::new()
     }
 
-    fn descriptor_static(_: ::std::option::Option<PutResponse>) -> &'static ::protobuf::reflect::MessageDescriptor {
+    fn descriptor_static(_: ::std::option::Option<SetResponse>) -> &'static ::protobuf::reflect::MessageDescriptor {
         static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
             lock: ::protobuf::lazy::ONCE_INIT,
             ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
@@ -881,16 +931,16 @@ impl ::protobuf::MessageStatic for PutResponse {
                 let mut fields = ::std::vec::Vec::new();
                 fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeEnum<Status>>(
                     "status",
-                    PutResponse::get_status_for_reflect,
-                    PutResponse::mut_status_for_reflect,
+                    SetResponse::get_status_for_reflect,
+                    SetResponse::mut_status_for_reflect,
                 ));
                 fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
                     "error",
-                    PutResponse::get_error_for_reflect,
-                    PutResponse::mut_error_for_reflect,
+                    SetResponse::get_error_for_reflect,
+                    SetResponse::mut_error_for_reflect,
                 ));
-                ::protobuf::reflect::MessageDescriptor::new::<PutResponse>(
-                    "PutResponse",
+                ::protobuf::reflect::MessageDescriptor::new::<SetResponse>(
+                    "SetResponse",
                     fields,
                     file_descriptor_proto()
                 )
@@ -899,7 +949,7 @@ impl ::protobuf::MessageStatic for PutResponse {
     }
 }
 
-impl ::protobuf::Clear for PutResponse {
+impl ::protobuf::Clear for SetResponse {
     fn clear(&mut self) {
         self.clear_status();
         self.clear_error();
@@ -907,13 +957,13 @@ impl ::protobuf::Clear for PutResponse {
     }
 }
 
-impl ::std::fmt::Debug for PutResponse {
+impl ::std::fmt::Debug for SetResponse {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         ::protobuf::text_format::fmt(self, f)
     }
 }
 
-impl ::protobuf::reflect::ProtobufValue for PutResponse {
+impl ::protobuf::reflect::ProtobufValue for SetResponse {
     fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
         ::protobuf::reflect::ProtobufValueRef::Message(self)
     }
@@ -1515,91 +1565,98 @@ impl ::protobuf::reflect::ProtobufValue for Status {
 static file_descriptor_proto_data: &'static [u8] = b"\
     \n\x08kv.proto\x12\x02kv\"0\n\x06KVPair\x12\x10\n\x03key\x18\x01\x20\x01\
     (\x0cR\x03key\x12\x14\n\x05value\x18\x02\x20\x01(\x0cR\x05value\"\x1e\n\
-    \nGetRequest\x12\x10\n\x03key\x18\x01\x20\x01(\x0cR\x03key\"g\n\x0bGetRe\
+    \nKeyRequest\x12\x10\n\x03key\x18\x01\x20\x01(\x0cR\x03key\"}\n\x0bGetRe\
     sponse\x12\"\n\x06status\x18\x01\x20\x01(\x0e2\n.kv.StatusR\x06status\
-    \x12\x14\n\x05exist\x18\x02\x20\x01(\x08R\x05exist\x12\x1e\n\x04data\x18\
-    \x03\x20\x01(\x0b2\n.kv.KVPairR\x04data\"G\n\x0bPutResponse\x12\"\n\x06s\
-    tatus\x18\x01\x20\x01(\x0e2\n.kv.StatusR\x06status\x12\x14\n\x05error\
-    \x18\x02\x20\x01(\tR\x05error\"R\n\x0bScanRequset\x12\x10\n\x03key\x18\
-    \x01\x20\x01(\x0cR\x03key\x12\x1b\n\tcan_equal\x18\x02\x20\x01(\x08R\x08\
-    canEqual\x12\x14\n\x05count\x18\x03\x20\x01(\x05R\x05count\"h\n\x0cScanR\
-    esponse\x12\"\n\x06status\x18\x01\x20\x01(\x0e2\n.kv.StatusR\x06status\
-    \x12\x14\n\x05error\x18\x02\x20\x01(\tR\x05error\x12\x1e\n\x04data\x18\
-    \x03\x20\x03(\x0b2\n.kv.KVPairR\x04data*\x1c\n\x06Status\x12\x06\n\x02OK\
-    \x10\0\x12\n\n\x06FAILED\x10\x012\x88\x01\n\tKVService\x12(\n\x03Get\x12\
-    \x0e.kv.GetRequest\x1a\x0f.kv.GetResponse\"\0\x12$\n\x03Put\x12\n.kv.KVP\
-    air\x1a\x0f.kv.PutResponse\"\0\x12+\n\x04Scan\x12\x0f.kv.ScanRequset\x1a\
-    \x10.kv.ScanResponse\"\0J\xa6\x0b\n\x06\x12\x04\0\0-\x01\n\x08\n\x01\x0c\
-    \x12\x03\0\0\x12\n\x08\n\x01\x02\x12\x03\x02\x08\n\n\n\n\x02\x05\0\x12\
-    \x04\x04\0\x07\x01\n\n\n\x03\x05\0\x01\x12\x03\x04\x05\x0b\n\x0b\n\x04\
-    \x05\0\x02\0\x12\x03\x05\x02\t\n\x0c\n\x05\x05\0\x02\0\x01\x12\x03\x05\
-    \x02\x04\n\x0c\n\x05\x05\0\x02\0\x02\x12\x03\x05\x07\x08\n\x0b\n\x04\x05\
-    \0\x02\x01\x12\x03\x06\x02\r\n\x0c\n\x05\x05\0\x02\x01\x01\x12\x03\x06\
-    \x02\x08\n\x0c\n\x05\x05\0\x02\x01\x02\x12\x03\x06\x0b\x0c\n\n\n\x02\x04\
-    \0\x12\x04\t\0\x0c\x01\n\n\n\x03\x04\0\x01\x12\x03\t\x08\x0e\n\x0b\n\x04\
-    \x04\0\x02\0\x12\x03\n\x02\x10\n\r\n\x05\x04\0\x02\0\x04\x12\x04\n\x02\t\
-    \x10\n\x0c\n\x05\x04\0\x02\0\x05\x12\x03\n\x02\x07\n\x0c\n\x05\x04\0\x02\
-    \0\x01\x12\x03\n\x08\x0b\n\x0c\n\x05\x04\0\x02\0\x03\x12\x03\n\x0e\x0f\n\
-    \x0b\n\x04\x04\0\x02\x01\x12\x03\x0b\x02\x12\n\r\n\x05\x04\0\x02\x01\x04\
-    \x12\x04\x0b\x02\n\x10\n\x0c\n\x05\x04\0\x02\x01\x05\x12\x03\x0b\x02\x07\
-    \n\x0c\n\x05\x04\0\x02\x01\x01\x12\x03\x0b\x08\r\n\x0c\n\x05\x04\0\x02\
-    \x01\x03\x12\x03\x0b\x10\x11\n\n\n\x02\x04\x01\x12\x04\x0e\0\x10\x01\n\n\
-    \n\x03\x04\x01\x01\x12\x03\x0e\x08\x12\n\x0b\n\x04\x04\x01\x02\0\x12\x03\
-    \x0f\x02\x10\n\r\n\x05\x04\x01\x02\0\x04\x12\x04\x0f\x02\x0e\x14\n\x0c\n\
-    \x05\x04\x01\x02\0\x05\x12\x03\x0f\x02\x07\n\x0c\n\x05\x04\x01\x02\0\x01\
-    \x12\x03\x0f\x08\x0b\n\x0c\n\x05\x04\x01\x02\0\x03\x12\x03\x0f\x0e\x0f\n\
-    \n\n\x02\x04\x02\x12\x04\x12\0\x16\x01\n\n\n\x03\x04\x02\x01\x12\x03\x12\
-    \x08\x13\n\x0b\n\x04\x04\x02\x02\0\x12\x03\x13\x02\x14\n\r\n\x05\x04\x02\
-    \x02\0\x04\x12\x04\x13\x02\x12\x15\n\x0c\n\x05\x04\x02\x02\0\x06\x12\x03\
-    \x13\x02\x08\n\x0c\n\x05\x04\x02\x02\0\x01\x12\x03\x13\t\x0f\n\x0c\n\x05\
-    \x04\x02\x02\0\x03\x12\x03\x13\x12\x13\n\x0b\n\x04\x04\x02\x02\x01\x12\
-    \x03\x14\x02\x11\n\r\n\x05\x04\x02\x02\x01\x04\x12\x04\x14\x02\x13\x14\n\
-    \x0c\n\x05\x04\x02\x02\x01\x05\x12\x03\x14\x02\x06\n\x0c\n\x05\x04\x02\
-    \x02\x01\x01\x12\x03\x14\x07\x0c\n\x0c\n\x05\x04\x02\x02\x01\x03\x12\x03\
-    \x14\x0f\x10\n\x0b\n\x04\x04\x02\x02\x02\x12\x03\x15\x02\x12\n\r\n\x05\
-    \x04\x02\x02\x02\x04\x12\x04\x15\x02\x14\x11\n\x0c\n\x05\x04\x02\x02\x02\
-    \x06\x12\x03\x15\x02\x08\n\x0c\n\x05\x04\x02\x02\x02\x01\x12\x03\x15\t\r\
-    \n\x0c\n\x05\x04\x02\x02\x02\x03\x12\x03\x15\x10\x11\n\n\n\x02\x04\x03\
-    \x12\x04\x18\0\x1b\x01\n\n\n\x03\x04\x03\x01\x12\x03\x18\x08\x13\n\x0b\n\
-    \x04\x04\x03\x02\0\x12\x03\x19\x02\x14\n\r\n\x05\x04\x03\x02\0\x04\x12\
-    \x04\x19\x02\x18\x15\n\x0c\n\x05\x04\x03\x02\0\x06\x12\x03\x19\x02\x08\n\
-    \x0c\n\x05\x04\x03\x02\0\x01\x12\x03\x19\t\x0f\n\x0c\n\x05\x04\x03\x02\0\
-    \x03\x12\x03\x19\x12\x13\n\x0b\n\x04\x04\x03\x02\x01\x12\x03\x1a\x02\x13\
-    \n\r\n\x05\x04\x03\x02\x01\x04\x12\x04\x1a\x02\x19\x14\n\x0c\n\x05\x04\
-    \x03\x02\x01\x05\x12\x03\x1a\x02\x08\n\x0c\n\x05\x04\x03\x02\x01\x01\x12\
-    \x03\x1a\t\x0e\n\x0c\n\x05\x04\x03\x02\x01\x03\x12\x03\x1a\x11\x12\n\n\n\
-    \x02\x04\x04\x12\x04\x1d\0!\x01\n\n\n\x03\x04\x04\x01\x12\x03\x1d\x08\
-    \x13\n\x0b\n\x04\x04\x04\x02\0\x12\x03\x1e\x02\x10\n\r\n\x05\x04\x04\x02\
-    \0\x04\x12\x04\x1e\x02\x1d\x15\n\x0c\n\x05\x04\x04\x02\0\x05\x12\x03\x1e\
-    \x02\x07\n\x0c\n\x05\x04\x04\x02\0\x01\x12\x03\x1e\x08\x0b\n\x0c\n\x05\
-    \x04\x04\x02\0\x03\x12\x03\x1e\x0e\x0f\n\x0b\n\x04\x04\x04\x02\x01\x12\
-    \x03\x1f\x02\x15\n\r\n\x05\x04\x04\x02\x01\x04\x12\x04\x1f\x02\x1e\x10\n\
-    \x0c\n\x05\x04\x04\x02\x01\x05\x12\x03\x1f\x02\x06\n\x0c\n\x05\x04\x04\
-    \x02\x01\x01\x12\x03\x1f\x07\x10\n\x0c\n\x05\x04\x04\x02\x01\x03\x12\x03\
-    \x1f\x13\x14\n\x0b\n\x04\x04\x04\x02\x02\x12\x03\x20\x02\x12\n\r\n\x05\
-    \x04\x04\x02\x02\x04\x12\x04\x20\x02\x1f\x15\n\x0c\n\x05\x04\x04\x02\x02\
-    \x05\x12\x03\x20\x02\x07\n\x0c\n\x05\x04\x04\x02\x02\x01\x12\x03\x20\x08\
-    \r\n\x0c\n\x05\x04\x04\x02\x02\x03\x12\x03\x20\x10\x11\n\n\n\x02\x04\x05\
-    \x12\x04#\0'\x01\n\n\n\x03\x04\x05\x01\x12\x03#\x08\x14\n\x0b\n\x04\x04\
-    \x05\x02\0\x12\x03$\x02\x14\n\r\n\x05\x04\x05\x02\0\x04\x12\x04$\x02#\
-    \x16\n\x0c\n\x05\x04\x05\x02\0\x06\x12\x03$\x02\x08\n\x0c\n\x05\x04\x05\
-    \x02\0\x01\x12\x03$\t\x0f\n\x0c\n\x05\x04\x05\x02\0\x03\x12\x03$\x12\x13\
-    \n\x0b\n\x04\x04\x05\x02\x01\x12\x03%\x02\x13\n\r\n\x05\x04\x05\x02\x01\
-    \x04\x12\x04%\x02$\x14\n\x0c\n\x05\x04\x05\x02\x01\x05\x12\x03%\x02\x08\
-    \n\x0c\n\x05\x04\x05\x02\x01\x01\x12\x03%\t\x0e\n\x0c\n\x05\x04\x05\x02\
-    \x01\x03\x12\x03%\x11\x12\n\x0b\n\x04\x04\x05\x02\x02\x12\x03&\x02\x1b\n\
-    \x0c\n\x05\x04\x05\x02\x02\x04\x12\x03&\x02\n\n\x0c\n\x05\x04\x05\x02\
-    \x02\x06\x12\x03&\x0b\x11\n\x0c\n\x05\x04\x05\x02\x02\x01\x12\x03&\x12\
-    \x16\n\x0c\n\x05\x04\x05\x02\x02\x03\x12\x03&\x19\x1a\n\n\n\x02\x06\0\
-    \x12\x04)\0-\x01\n\n\n\x03\x06\0\x01\x12\x03)\x08\x11\n\x0b\n\x04\x06\0\
-    \x02\0\x12\x03*\x02.\n\x0c\n\x05\x06\0\x02\0\x01\x12\x03*\x06\t\n\x0c\n\
-    \x05\x06\0\x02\0\x02\x12\x03*\n\x14\n\x0c\n\x05\x06\0\x02\0\x03\x12\x03*\
-    \x1f*\n\x0b\n\x04\x06\0\x02\x01\x12\x03+\x02*\n\x0c\n\x05\x06\0\x02\x01\
-    \x01\x12\x03+\x06\t\n\x0c\n\x05\x06\0\x02\x01\x02\x12\x03+\n\x10\n\x0c\n\
-    \x05\x06\0\x02\x01\x03\x12\x03+\x1b&\n\x0b\n\x04\x06\0\x02\x02\x12\x03,\
-    \x021\n\x0c\n\x05\x06\0\x02\x02\x01\x12\x03,\x06\n\n\x0c\n\x05\x06\0\x02\
-    \x02\x02\x12\x03,\x0b\x16\n\x0c\n\x05\x06\0\x02\x02\x03\x12\x03,!-b\x06p\
-    roto3\
+    \x12\x14\n\x05error\x18\x02\x20\x01(\tR\x05error\x12\x14\n\x05exist\x18\
+    \x03\x20\x01(\x08R\x05exist\x12\x1e\n\x04data\x18\x04\x20\x01(\x0b2\n.kv\
+    .KVPairR\x04data\"G\n\x0bSetResponse\x12\"\n\x06status\x18\x01\x20\x01(\
+    \x0e2\n.kv.StatusR\x06status\x12\x14\n\x05error\x18\x02\x20\x01(\tR\x05e\
+    rror\"R\n\x0bScanRequset\x12\x10\n\x03key\x18\x01\x20\x01(\x0cR\x03key\
+    \x12\x1b\n\tcan_equal\x18\x02\x20\x01(\x08R\x08canEqual\x12\x14\n\x05cou\
+    nt\x18\x03\x20\x01(\x05R\x05count\"h\n\x0cScanResponse\x12\"\n\x06status\
+    \x18\x01\x20\x01(\x0e2\n.kv.StatusR\x06status\x12\x14\n\x05error\x18\x02\
+    \x20\x01(\tR\x05error\x12\x1e\n\x04data\x18\x03\x20\x03(\x0b2\n.kv.KVPai\
+    rR\x04data*\x1c\n\x06Status\x12\x06\n\x02OK\x10\0\x12\n\n\x06FAILED\x10\
+    \x012\xb5\x01\n\tKVService\x12(\n\x03Get\x12\x0e.kv.KeyRequest\x1a\x0f.k\
+    v.GetResponse\"\0\x12$\n\x03Put\x12\n.kv.KVPair\x1a\x0f.kv.SetResponse\"\
+    \0\x12+\n\x06Remove\x12\x0e.kv.KeyRequest\x1a\x0f.kv.SetResponse\"\0\x12\
+    +\n\x04Scan\x12\x0f.kv.ScanRequset\x1a\x10.kv.ScanResponse\"\0J\xa3\x0c\
+    \n\x06\x12\x04\0\0/\x01\n\x08\n\x01\x0c\x12\x03\0\0\x12\n\x08\n\x01\x02\
+    \x12\x03\x02\x08\n\n\n\n\x02\x05\0\x12\x04\x04\0\x07\x01\n\n\n\x03\x05\0\
+    \x01\x12\x03\x04\x05\x0b\n\x0b\n\x04\x05\0\x02\0\x12\x03\x05\x02\t\n\x0c\
+    \n\x05\x05\0\x02\0\x01\x12\x03\x05\x02\x04\n\x0c\n\x05\x05\0\x02\0\x02\
+    \x12\x03\x05\x07\x08\n\x0b\n\x04\x05\0\x02\x01\x12\x03\x06\x02\r\n\x0c\n\
+    \x05\x05\0\x02\x01\x01\x12\x03\x06\x02\x08\n\x0c\n\x05\x05\0\x02\x01\x02\
+    \x12\x03\x06\x0b\x0c\n\n\n\x02\x04\0\x12\x04\t\0\x0c\x01\n\n\n\x03\x04\0\
+    \x01\x12\x03\t\x08\x0e\n\x0b\n\x04\x04\0\x02\0\x12\x03\n\x02\x10\n\r\n\
+    \x05\x04\0\x02\0\x04\x12\x04\n\x02\t\x10\n\x0c\n\x05\x04\0\x02\0\x05\x12\
+    \x03\n\x02\x07\n\x0c\n\x05\x04\0\x02\0\x01\x12\x03\n\x08\x0b\n\x0c\n\x05\
+    \x04\0\x02\0\x03\x12\x03\n\x0e\x0f\n\x0b\n\x04\x04\0\x02\x01\x12\x03\x0b\
+    \x02\x12\n\r\n\x05\x04\0\x02\x01\x04\x12\x04\x0b\x02\n\x10\n\x0c\n\x05\
+    \x04\0\x02\x01\x05\x12\x03\x0b\x02\x07\n\x0c\n\x05\x04\0\x02\x01\x01\x12\
+    \x03\x0b\x08\r\n\x0c\n\x05\x04\0\x02\x01\x03\x12\x03\x0b\x10\x11\n\n\n\
+    \x02\x04\x01\x12\x04\x0e\0\x10\x01\n\n\n\x03\x04\x01\x01\x12\x03\x0e\x08\
+    \x12\n\x0b\n\x04\x04\x01\x02\0\x12\x03\x0f\x02\x10\n\r\n\x05\x04\x01\x02\
+    \0\x04\x12\x04\x0f\x02\x0e\x14\n\x0c\n\x05\x04\x01\x02\0\x05\x12\x03\x0f\
+    \x02\x07\n\x0c\n\x05\x04\x01\x02\0\x01\x12\x03\x0f\x08\x0b\n\x0c\n\x05\
+    \x04\x01\x02\0\x03\x12\x03\x0f\x0e\x0f\n\n\n\x02\x04\x02\x12\x04\x12\0\
+    \x17\x01\n\n\n\x03\x04\x02\x01\x12\x03\x12\x08\x13\n\x0b\n\x04\x04\x02\
+    \x02\0\x12\x03\x13\x02\x14\n\r\n\x05\x04\x02\x02\0\x04\x12\x04\x13\x02\
+    \x12\x15\n\x0c\n\x05\x04\x02\x02\0\x06\x12\x03\x13\x02\x08\n\x0c\n\x05\
+    \x04\x02\x02\0\x01\x12\x03\x13\t\x0f\n\x0c\n\x05\x04\x02\x02\0\x03\x12\
+    \x03\x13\x12\x13\n\x0b\n\x04\x04\x02\x02\x01\x12\x03\x14\x02\x13\n\r\n\
+    \x05\x04\x02\x02\x01\x04\x12\x04\x14\x02\x13\x14\n\x0c\n\x05\x04\x02\x02\
+    \x01\x05\x12\x03\x14\x02\x08\n\x0c\n\x05\x04\x02\x02\x01\x01\x12\x03\x14\
+    \t\x0e\n\x0c\n\x05\x04\x02\x02\x01\x03\x12\x03\x14\x11\x12\n\x0b\n\x04\
+    \x04\x02\x02\x02\x12\x03\x15\x02\x11\n\r\n\x05\x04\x02\x02\x02\x04\x12\
+    \x04\x15\x02\x14\x13\n\x0c\n\x05\x04\x02\x02\x02\x05\x12\x03\x15\x02\x06\
+    \n\x0c\n\x05\x04\x02\x02\x02\x01\x12\x03\x15\x07\x0c\n\x0c\n\x05\x04\x02\
+    \x02\x02\x03\x12\x03\x15\x0f\x10\n\x0b\n\x04\x04\x02\x02\x03\x12\x03\x16\
+    \x02\x12\n\r\n\x05\x04\x02\x02\x03\x04\x12\x04\x16\x02\x15\x11\n\x0c\n\
+    \x05\x04\x02\x02\x03\x06\x12\x03\x16\x02\x08\n\x0c\n\x05\x04\x02\x02\x03\
+    \x01\x12\x03\x16\t\r\n\x0c\n\x05\x04\x02\x02\x03\x03\x12\x03\x16\x10\x11\
+    \n\n\n\x02\x04\x03\x12\x04\x19\0\x1c\x01\n\n\n\x03\x04\x03\x01\x12\x03\
+    \x19\x08\x13\n\x0b\n\x04\x04\x03\x02\0\x12\x03\x1a\x02\x14\n\r\n\x05\x04\
+    \x03\x02\0\x04\x12\x04\x1a\x02\x19\x15\n\x0c\n\x05\x04\x03\x02\0\x06\x12\
+    \x03\x1a\x02\x08\n\x0c\n\x05\x04\x03\x02\0\x01\x12\x03\x1a\t\x0f\n\x0c\n\
+    \x05\x04\x03\x02\0\x03\x12\x03\x1a\x12\x13\n\x0b\n\x04\x04\x03\x02\x01\
+    \x12\x03\x1b\x02\x13\n\r\n\x05\x04\x03\x02\x01\x04\x12\x04\x1b\x02\x1a\
+    \x14\n\x0c\n\x05\x04\x03\x02\x01\x05\x12\x03\x1b\x02\x08\n\x0c\n\x05\x04\
+    \x03\x02\x01\x01\x12\x03\x1b\t\x0e\n\x0c\n\x05\x04\x03\x02\x01\x03\x12\
+    \x03\x1b\x11\x12\n\n\n\x02\x04\x04\x12\x04\x1e\0\"\x01\n\n\n\x03\x04\x04\
+    \x01\x12\x03\x1e\x08\x13\n\x0b\n\x04\x04\x04\x02\0\x12\x03\x1f\x02\x10\n\
+    \r\n\x05\x04\x04\x02\0\x04\x12\x04\x1f\x02\x1e\x15\n\x0c\n\x05\x04\x04\
+    \x02\0\x05\x12\x03\x1f\x02\x07\n\x0c\n\x05\x04\x04\x02\0\x01\x12\x03\x1f\
+    \x08\x0b\n\x0c\n\x05\x04\x04\x02\0\x03\x12\x03\x1f\x0e\x0f\n\x0b\n\x04\
+    \x04\x04\x02\x01\x12\x03\x20\x02\x15\n\r\n\x05\x04\x04\x02\x01\x04\x12\
+    \x04\x20\x02\x1f\x10\n\x0c\n\x05\x04\x04\x02\x01\x05\x12\x03\x20\x02\x06\
+    \n\x0c\n\x05\x04\x04\x02\x01\x01\x12\x03\x20\x07\x10\n\x0c\n\x05\x04\x04\
+    \x02\x01\x03\x12\x03\x20\x13\x14\n\x0b\n\x04\x04\x04\x02\x02\x12\x03!\
+    \x02\x12\n\r\n\x05\x04\x04\x02\x02\x04\x12\x04!\x02\x20\x15\n\x0c\n\x05\
+    \x04\x04\x02\x02\x05\x12\x03!\x02\x07\n\x0c\n\x05\x04\x04\x02\x02\x01\
+    \x12\x03!\x08\r\n\x0c\n\x05\x04\x04\x02\x02\x03\x12\x03!\x10\x11\n\n\n\
+    \x02\x04\x05\x12\x04$\0(\x01\n\n\n\x03\x04\x05\x01\x12\x03$\x08\x14\n\
+    \x0b\n\x04\x04\x05\x02\0\x12\x03%\x02\x14\n\r\n\x05\x04\x05\x02\0\x04\
+    \x12\x04%\x02$\x16\n\x0c\n\x05\x04\x05\x02\0\x06\x12\x03%\x02\x08\n\x0c\
+    \n\x05\x04\x05\x02\0\x01\x12\x03%\t\x0f\n\x0c\n\x05\x04\x05\x02\0\x03\
+    \x12\x03%\x12\x13\n\x0b\n\x04\x04\x05\x02\x01\x12\x03&\x02\x13\n\r\n\x05\
+    \x04\x05\x02\x01\x04\x12\x04&\x02%\x14\n\x0c\n\x05\x04\x05\x02\x01\x05\
+    \x12\x03&\x02\x08\n\x0c\n\x05\x04\x05\x02\x01\x01\x12\x03&\t\x0e\n\x0c\n\
+    \x05\x04\x05\x02\x01\x03\x12\x03&\x11\x12\n\x0b\n\x04\x04\x05\x02\x02\
+    \x12\x03'\x02\x1b\n\x0c\n\x05\x04\x05\x02\x02\x04\x12\x03'\x02\n\n\x0c\n\
+    \x05\x04\x05\x02\x02\x06\x12\x03'\x0b\x11\n\x0c\n\x05\x04\x05\x02\x02\
+    \x01\x12\x03'\x12\x16\n\x0c\n\x05\x04\x05\x02\x02\x03\x12\x03'\x19\x1a\n\
+    \n\n\x02\x06\0\x12\x04*\0/\x01\n\n\n\x03\x06\0\x01\x12\x03*\x08\x11\n\
+    \x0b\n\x04\x06\0\x02\0\x12\x03+\x02.\n\x0c\n\x05\x06\0\x02\0\x01\x12\x03\
+    +\x06\t\n\x0c\n\x05\x06\0\x02\0\x02\x12\x03+\n\x14\n\x0c\n\x05\x06\0\x02\
+    \0\x03\x12\x03+\x1f*\n\x0b\n\x04\x06\0\x02\x01\x12\x03,\x02*\n\x0c\n\x05\
+    \x06\0\x02\x01\x01\x12\x03,\x06\t\n\x0c\n\x05\x06\0\x02\x01\x02\x12\x03,\
+    \n\x10\n\x0c\n\x05\x06\0\x02\x01\x03\x12\x03,\x1b&\n\x0b\n\x04\x06\0\x02\
+    \x02\x12\x03-\x021\n\x0c\n\x05\x06\0\x02\x02\x01\x12\x03-\x06\x0c\n\x0c\
+    \n\x05\x06\0\x02\x02\x02\x12\x03-\r\x17\n\x0c\n\x05\x06\0\x02\x02\x03\
+    \x12\x03-\"-\n\x0b\n\x04\x06\0\x02\x03\x12\x03.\x021\n\x0c\n\x05\x06\0\
+    \x02\x03\x01\x12\x03.\x06\n\n\x0c\n\x05\x06\0\x02\x03\x02\x12\x03.\x0b\
+    \x16\n\x0c\n\x05\x06\0\x02\x03\x03\x12\x03.!-b\x06proto3\
 ";
 
 static mut file_descriptor_proto_lazy: ::protobuf::lazy::Lazy<::protobuf::descriptor::FileDescriptorProto> = ::protobuf::lazy::Lazy {

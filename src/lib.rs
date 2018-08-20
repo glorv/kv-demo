@@ -5,7 +5,6 @@ extern crate error_chain;
 extern crate clap;
 extern crate futures;
 extern crate grpcio;
-extern crate serde_derive;
 #[macro_use]
 extern crate log;
 extern crate num_cpus;

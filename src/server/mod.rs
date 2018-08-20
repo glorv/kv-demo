@@ -20,7 +20,7 @@ impl KVServer {
 }
 
 impl KvService for KVServer {
-    fn get(&self, ctx: RpcContext, req: GetRequest, sink: UnarySink<GetResponse>) {
+    fn get(&self, ctx: RpcContext, req: KeyRequest, sink: UnarySink<GetResponse>) {
         let mut r = GetResponse::new();
         if let Some(v) = self.db.get(req.get_key()) {
             let mut pair = KVPair::new();
@@ -36,8 +36,8 @@ impl KvService for KVServer {
         ctx.spawn(fut.map_err(move |e| info!("failed to reply to request {:?}", e)));
     }
 
-    fn put(&self, ctx: RpcContext, req: KVPair, sink: UnarySink<PutResponse>) {
-        let mut r = PutResponse::new();
+    fn put(&self, ctx: RpcContext, req: KVPair, sink: UnarySink<SetResponse>) {
+        let mut r = SetResponse::new();
         if let Err(e) = self
             .db
             .put(req.get_key().to_vec(), req.get_value().to_vec())
@@ -51,23 +51,37 @@ impl KvService for KVServer {
         ctx.spawn(fut.map_err(move |e| info!("failed to reply to request {:?}", e)));
     }
 
+    fn remove(&self, ctx: RpcContext, req: KeyRequest, sink: UnarySink<SetResponse>) {
+        let mut r = SetResponse::new();
+        if let Err(e) = self.db.remove(&req.get_key().to_vec()) {
+            r.set_status(Status::FAILED);
+            r.set_error(format!("{}", e));
+        } else {
+            r.set_status(Status::OK);
+        }
+        let fut = sink.success(r);
+        ctx.spawn(fut.map_err(move |e| info!("failed to reply to request {:?}", e)));
+    }
+
     fn scan(&self, ctx: RpcContext, req: ScanRequset, sink: UnarySink<ScanResponse>) {
         let tables = self.db.read_view();
+        let mut r = ScanResponse::new();
         let mut iter = DatabaseIterator::new(&tables);
         let key = req.get_key();
         if !key.is_empty() {
             iter.advance(key);
         }
-        let mut r = ScanResponse::new();
+        if iter.valid() {
+            if !req.can_equal && iter.key().as_slice() == key {
+                iter.next();
+            }
+        }
         loop {
             if !iter.valid() {
                 break;
             }
             if req.count <= r.data.len() as i32 {
                 break;
-            }
-            if !req.can_equal && iter.key().as_slice() == key {
-                iter.next();
             }
             let mut pair = KVPair::new();
             pair.set_key(iter.key().clone());

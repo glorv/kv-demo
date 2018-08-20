@@ -2,13 +2,14 @@ use std::sync::Arc;
 
 use grpcio::{ChannelBuilder, EnvBuilder};
 
+use codec::BytesSerializer;
 use errors::Result;
-use proto::kv_grpc::KvServiceClient;
 use proto::kv::*;
+use proto::kv_grpc::KvServiceClient;
 
 pub struct ConnectOptions {
-    pub addr: String,   //host:port
-    pub batch_size: usize
+    pub addr: String, //host:port
+    pub batch_size: usize,
 }
 
 impl Default for ConnectOptions {
@@ -19,9 +20,7 @@ impl Default for ConnectOptions {
 
 impl ConnectOptions {
     pub fn new(addr: String, batch_size: usize) -> ConnectOptions {
-        ConnectOptions {
-            addr, batch_size,
-        }
+        ConnectOptions { addr, batch_size }
     }
 }
 
@@ -32,18 +31,20 @@ pub struct KVGrpcClient {
 
 impl KVGrpcClient {
     pub fn open(options: ConnectOptions) -> Self {
-        let channel = ChannelBuilder::new(Arc::new(EnvBuilder::new().build())).connect(&options.addr);
+        let channel =
+            ChannelBuilder::new(Arc::new(EnvBuilder::new().build())).connect(&options.addr);
         let client = KvServiceClient::new(channel);
-        KVGrpcClient {
-            options,
-            client,
-        }
+        KVGrpcClient { options, client }
     }
 
-    pub fn put(&self, key: Vec<u8>, value: Vec<u8>) -> Result<()> {
+    pub fn put<K, V>(&self, key: &K, value: &V) -> Result<()>
+    where
+        K: BytesSerializer,
+        V: BytesSerializer,
+    {
         let mut pair = KVPair::new();
-        pair.set_key(key);
-        pair.set_value(value);
+        pair.set_key(key.to_bytes()?);
+        pair.set_value(value.to_bytes()?);
         let res = self.client.put(&pair)?;
         if res.get_status() == Status::OK {
             Ok(())
@@ -52,29 +53,55 @@ impl KVGrpcClient {
         }
     }
 
-    pub fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
-        let mut req = GetRequest::new();
-        req.set_key(key.to_vec());
+    pub fn get<K, V>(&self, key: &K) -> Result<Option<V>>
+    where
+        K: BytesSerializer,
+        V: BytesSerializer,
+    {
+        let mut req = KeyRequest::new();
+        req.set_key(key.to_bytes()?);
         let res = self.client.get(&req)?;
         if res.get_status() == Status::OK {
             if res.get_exist() {
-                Ok(Some(res.get_data().get_value().to_vec()))
+                Ok(Some(V::from_bytes(res.get_data().get_value())?))
             } else {
                 Ok(None)
             }
         } else {
-            bail!("get failed")
+            bail!("get failed, error: {}", res.get_error())
         }
     }
 
-    pub fn scan<'a>(&'a self, key: Option<Vec<u8>>) -> Result<KVIterator<'a>> {
+    pub fn remove<K>(&self, key: &K) -> Result<()>
+    where
+        K: BytesSerializer,
+    {
+        let mut req = KeyRequest::new();
+        req.set_key(key.to_bytes()?);
+        let res = self.client.remove(&req)?;
+        if res.get_status() != Status::OK {
+            bail!("remove failed, error: {}", res.get_error())
+        } else {
+            Ok(())
+        }
+    }
+
+    pub fn scan<'a, K>(&'a self, key: Option<&K>) -> Result<KVIterator<'a>>
+    where
+        K: BytesSerializer,
+    {
         let mut req = ScanRequset::new();
-        req.set_key(key.unwrap_or(Vec::new()));
+        let k = if let Some(key) = key {
+            key.to_bytes()?
+        } else {
+            Vec::new()
+        };
+        req.set_key(k);
         req.set_can_equal(true);
         req.set_count(self.options.batch_size as i32);
         let mut res = self.client.scan(&req)?;
         let has_more = res.get_data().len() >= self.options.batch_size;
-        if res.get_status() != Status::OK{
+        if res.get_status() != Status::OK {
             bail!("scan failed by error: {}", res.get_error())
         } else {
             let mut buf_data = res.take_data().to_vec();
@@ -93,9 +120,9 @@ impl KVGrpcClient {
         }
     }
 
-//    pub fn remove(&self, key: Vec<u8>) -> Result<()> {
-//        self.client.delete
-//    }
+    //    pub fn remove(&self, key: Vec<u8>) -> Result<()> {
+    //        self.client.delete
+    //    }
 }
 
 pub struct KVIterator<'a> {

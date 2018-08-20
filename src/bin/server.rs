@@ -11,7 +11,6 @@ extern crate num_cpus;
 extern crate protobuf;
 extern crate rand;
 extern crate serde;
-extern crate serde_derive;
 
 use std::io::{self as stdio, Read};
 use std::sync::Arc;

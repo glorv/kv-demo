@@ -18,16 +18,23 @@
 #![allow(unused_imports)]
 #![allow(unused_results)]
 
-const METHOD_KV_SERVICE_GET: ::grpcio::Method<super::kv::GetRequest, super::kv::GetResponse> = ::grpcio::Method {
+const METHOD_KV_SERVICE_GET: ::grpcio::Method<super::kv::KeyRequest, super::kv::GetResponse> = ::grpcio::Method {
     ty: ::grpcio::MethodType::Unary,
     name: "/kv.KVService/Get",
     req_mar: ::grpcio::Marshaller { ser: ::grpcio::pb_ser, de: ::grpcio::pb_de },
     resp_mar: ::grpcio::Marshaller { ser: ::grpcio::pb_ser, de: ::grpcio::pb_de },
 };
 
-const METHOD_KV_SERVICE_PUT: ::grpcio::Method<super::kv::KVPair, super::kv::PutResponse> = ::grpcio::Method {
+const METHOD_KV_SERVICE_PUT: ::grpcio::Method<super::kv::KVPair, super::kv::SetResponse> = ::grpcio::Method {
     ty: ::grpcio::MethodType::Unary,
     name: "/kv.KVService/Put",
+    req_mar: ::grpcio::Marshaller { ser: ::grpcio::pb_ser, de: ::grpcio::pb_de },
+    resp_mar: ::grpcio::Marshaller { ser: ::grpcio::pb_ser, de: ::grpcio::pb_de },
+};
+
+const METHOD_KV_SERVICE_REMOVE: ::grpcio::Method<super::kv::KeyRequest, super::kv::SetResponse> = ::grpcio::Method {
+    ty: ::grpcio::MethodType::Unary,
+    name: "/kv.KVService/Remove",
     req_mar: ::grpcio::Marshaller { ser: ::grpcio::pb_ser, de: ::grpcio::pb_de },
     resp_mar: ::grpcio::Marshaller { ser: ::grpcio::pb_ser, de: ::grpcio::pb_de },
 };
@@ -50,36 +57,52 @@ impl KvServiceClient {
         }
     }
 
-    pub fn get_opt(&self, req: &super::kv::GetRequest, opt: ::grpcio::CallOption) -> ::grpcio::Result<super::kv::GetResponse> {
+    pub fn get_opt(&self, req: &super::kv::KeyRequest, opt: ::grpcio::CallOption) -> ::grpcio::Result<super::kv::GetResponse> {
         self.client.unary_call(&METHOD_KV_SERVICE_GET, req, opt)
     }
 
-    pub fn get(&self, req: &super::kv::GetRequest) -> ::grpcio::Result<super::kv::GetResponse> {
+    pub fn get(&self, req: &super::kv::KeyRequest) -> ::grpcio::Result<super::kv::GetResponse> {
         self.get_opt(req, ::grpcio::CallOption::default())
     }
 
-    pub fn get_async_opt(&self, req: &super::kv::GetRequest, opt: ::grpcio::CallOption) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::kv::GetResponse>> {
+    pub fn get_async_opt(&self, req: &super::kv::KeyRequest, opt: ::grpcio::CallOption) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::kv::GetResponse>> {
         self.client.unary_call_async(&METHOD_KV_SERVICE_GET, req, opt)
     }
 
-    pub fn get_async(&self, req: &super::kv::GetRequest) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::kv::GetResponse>> {
+    pub fn get_async(&self, req: &super::kv::KeyRequest) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::kv::GetResponse>> {
         self.get_async_opt(req, ::grpcio::CallOption::default())
     }
 
-    pub fn put_opt(&self, req: &super::kv::KVPair, opt: ::grpcio::CallOption) -> ::grpcio::Result<super::kv::PutResponse> {
+    pub fn put_opt(&self, req: &super::kv::KVPair, opt: ::grpcio::CallOption) -> ::grpcio::Result<super::kv::SetResponse> {
         self.client.unary_call(&METHOD_KV_SERVICE_PUT, req, opt)
     }
 
-    pub fn put(&self, req: &super::kv::KVPair) -> ::grpcio::Result<super::kv::PutResponse> {
+    pub fn put(&self, req: &super::kv::KVPair) -> ::grpcio::Result<super::kv::SetResponse> {
         self.put_opt(req, ::grpcio::CallOption::default())
     }
 
-    pub fn put_async_opt(&self, req: &super::kv::KVPair, opt: ::grpcio::CallOption) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::kv::PutResponse>> {
+    pub fn put_async_opt(&self, req: &super::kv::KVPair, opt: ::grpcio::CallOption) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::kv::SetResponse>> {
         self.client.unary_call_async(&METHOD_KV_SERVICE_PUT, req, opt)
     }
 
-    pub fn put_async(&self, req: &super::kv::KVPair) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::kv::PutResponse>> {
+    pub fn put_async(&self, req: &super::kv::KVPair) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::kv::SetResponse>> {
         self.put_async_opt(req, ::grpcio::CallOption::default())
+    }
+
+    pub fn remove_opt(&self, req: &super::kv::KeyRequest, opt: ::grpcio::CallOption) -> ::grpcio::Result<super::kv::SetResponse> {
+        self.client.unary_call(&METHOD_KV_SERVICE_REMOVE, req, opt)
+    }
+
+    pub fn remove(&self, req: &super::kv::KeyRequest) -> ::grpcio::Result<super::kv::SetResponse> {
+        self.remove_opt(req, ::grpcio::CallOption::default())
+    }
+
+    pub fn remove_async_opt(&self, req: &super::kv::KeyRequest, opt: ::grpcio::CallOption) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::kv::SetResponse>> {
+        self.client.unary_call_async(&METHOD_KV_SERVICE_REMOVE, req, opt)
+    }
+
+    pub fn remove_async(&self, req: &super::kv::KeyRequest) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::kv::SetResponse>> {
+        self.remove_async_opt(req, ::grpcio::CallOption::default())
     }
 
     pub fn scan_opt(&self, req: &super::kv::ScanRequset, opt: ::grpcio::CallOption) -> ::grpcio::Result<super::kv::ScanResponse> {
@@ -103,8 +126,9 @@ impl KvServiceClient {
 }
 
 pub trait KvService {
-    fn get(&self, ctx: ::grpcio::RpcContext, req: super::kv::GetRequest, sink: ::grpcio::UnarySink<super::kv::GetResponse>);
-    fn put(&self, ctx: ::grpcio::RpcContext, req: super::kv::KVPair, sink: ::grpcio::UnarySink<super::kv::PutResponse>);
+    fn get(&self, ctx: ::grpcio::RpcContext, req: super::kv::KeyRequest, sink: ::grpcio::UnarySink<super::kv::GetResponse>);
+    fn put(&self, ctx: ::grpcio::RpcContext, req: super::kv::KVPair, sink: ::grpcio::UnarySink<super::kv::SetResponse>);
+    fn remove(&self, ctx: ::grpcio::RpcContext, req: super::kv::KeyRequest, sink: ::grpcio::UnarySink<super::kv::SetResponse>);
     fn scan(&self, ctx: ::grpcio::RpcContext, req: super::kv::ScanRequset, sink: ::grpcio::UnarySink<super::kv::ScanResponse>);
 }
 
@@ -117,6 +141,10 @@ pub fn create_kv_service<S: KvService + Send + Clone + 'static>(s: S) -> ::grpci
     let instance = s.clone();
     builder = builder.add_unary_handler(&METHOD_KV_SERVICE_PUT, move |ctx, req, resp| {
         instance.put(ctx, req, resp)
+    });
+    let instance = s.clone();
+    builder = builder.add_unary_handler(&METHOD_KV_SERVICE_REMOVE, move |ctx, req, resp| {
+        instance.remove(ctx, req, resp)
     });
     let instance = s.clone();
     builder = builder.add_unary_handler(&METHOD_KV_SERVICE_SCAN, move |ctx, req, resp| {
